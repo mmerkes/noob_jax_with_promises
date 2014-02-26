@@ -1,32 +1,47 @@
+/*
+  Thanks to David Flanagan for writing JavaScript: The Definitive Guide
+  which has helped guide my AJAX implementation and some of the code
+  came from his book.
+*/
 
 var Jax = {};
 
+// GET request implementation
 Jax.get = function( url, success, failure ) {
   var request = new XMLHttpRequest(),
-      p = new Promise();
+      p = promisify( success, failure );
 
   request.open( 'GET', url );
 
   request.onreadystatechange = function() {
     // Check to see if the ready state is 4 -> DONE
     if( request.readyState === 4 ) {
+      console.log( request.status );
       // If request was successful
       if( request.status === 200 ) {
-        var type = request.getResponseHeader("Content-Type");
-        // Make sure that the content is text
-        if( type.match(/^text/)) {
-          if( success ) {
-            success( request.responseText );
-          }
-          p.resolve();
+        var type = request.getResponseHeader("Content-Type"),
+            data;
+
+        // Check if the server sent back JSON
+        if ( type === 'application/json' ) {
+          data = JSON.parse( request.responseText );
+        }  
+        // Check if the server sent XML
+        else if( type.indexOf('xml') !== -1 && request.responseXML ) {
+          data = request.responseXML;
+        } 
+        // Otherwise, just grab the response text
+        else {
+          data = request.responseText;
         }
+
+        // Process any resolve callbacks in promise
+        p.resolve( data );
       }
       // Otherwise, there was a failure, and the failure callback
       // should be called.
       else {
-        if( failure ) {
-          failure();
-        }
+        // Process any reject callbacks in our promise
         p.reject();
       }
     }
@@ -34,6 +49,60 @@ Jax.get = function( url, success, failure ) {
 
   request.send(null);
 
+  return p;
+};
+
+// POST implementation
+Jax.post = function( url, data, success, failure ) {
+  var request = new XMLHttpRequest(),
+      p = promisify( success, failure );
+
+  // Open the HTTP request to the url
+  request.open( 'POST', url );
+
+  // Set the request header to JSON
+  request.setRequestHeader("Content-Type", "application/json");
+
+  // Listen for a state change
+  request.onreadystatechange = function() {
+    // If the request has completed
+    if( request.readyState === 4 ) {
+      // If it was successefull
+      if( request.status === 200 ) {
+        // Process any resolve callbacks in promise
+        p.resolve( data );
+      }
+      // If the request failed
+      else {
+        //  Process any reject callbacks in our promise
+        p.reject();
+      }
+    }
+  }
+
+  request.send( JSON.stringify( data ) );
+
+  return p;
+};
+
+// Helper function that takes a success and failure callback, and returns
+// a promise with those added to the queue.
+function promisify( success, failure ) {
+  // Create a new instance of promise
+  var p = new Promise();
+
+  // If a success callback was provided
+  if( success ) {
+    // add success to the promise
+    p.success( success );
+  }
+  // If a failure callback was provided
+  if( failure ) {
+    // add failure to the promise
+    p.failure( failure );
+  }
+
+  // return the promise
   return p;
 }
 
@@ -53,8 +122,6 @@ function Promise() {
 
 Promise.prototype = {
   then: function(success, failure, always) {
-
-
     this.pending.push({ resolve: success, reject: failure, always: always });
     return this;
   },
@@ -78,7 +145,7 @@ Promise.prototype = {
   },
 
   failure: function( callback ) {
-    this.pending.push({ failure: callback });
+    this.pending.push({ reject: callback });
     return this;
   },
 
@@ -87,6 +154,48 @@ Promise.prototype = {
     return this;
   }
 };
+
+
+/*
+  Basic GET test string
+  Jax.get( 'api', function( data ) {
+    console.log( data );
+  }, function() {
+    console.log( 'Nice try bucko!' )
+  }).then( function() {
+    console.log( 'I will only love you when you succeed');
+  }, function() {
+    console.log( 'Your mother will love you in failure' );
+  }, function() {
+    console.log( 'Your dog will love you always');
+  }).success( function() {
+    console.log( 'Yay, success!' );
+  }).failure( function() {
+    console.log( 'Boo, failure...' );
+  }).always( function() {
+    console.log( 'Always!!!!');
+  });
+
+  Basic POST test string
+  Jax.post( 'api', { name: 'Matt', age: 30 }, function( data ) {
+    console.log( data );
+  }, function() {
+    console.log( 'Such a failure...' );
+  }).then( function() {
+    console.log( 'I will only love you when you succeed');
+  }, function() {
+    console.log( 'Your mother will love you in failure' );
+  }, function() {
+    console.log( 'Your dog will love you always');
+  }).success( function() {
+    console.log( 'Yay, success!' );
+  }).failure( function() {
+    console.log( 'Boo, failure...' );
+  }).always( function() {
+    console.log( 'Always!!!!');
+  });
+*/
+
 
 
 

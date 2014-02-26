@@ -17,7 +17,14 @@ http.createServer(app).listen(app.get('port'), function(){
 });
 
 app.get('/api', function( request, response ) {
-  response.send('It worked!')
+  response.send({ 'name' : 'Matt', 'age': 30 });
+  response.end();
+});
+
+app.post('/api', function( request, response ) {
+  console.log( request.body );
+
+  response.send('Nice work, buddy!');
   response.end();
 });
 
